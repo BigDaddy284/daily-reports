@@ -23,7 +23,10 @@ from zoneinfo import ZoneInfo
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SNAP_DIR = os.path.join(ROOT, "snapshots")
 REPORT_DIR = os.path.join(ROOT, "reports")
-LONDON = ZoneInfo("Europe/London")
+try:
+    LONDON = ZoneInfo("Europe/London")
+except Exception:  # Windows without the tzdata package
+    sys.exit("error: time zone data missing - run: pip install tzdata")
 
 # Topics exactly as requested (GitHub topic slugs).
 TOPICS = [("AI", "ai"), ("Alternative", "alternative"),
@@ -198,10 +201,10 @@ def build_report(mode, today, pool, topic_recent):
     since30 = (today - dt.timedelta(days=30)).isoformat()
 
     title = "Weekly GitHub summary" if weekly else "Daily GitHub report"
-    lines = [f"# {title} — {today.strftime('%A %-d %B %Y')}", ""]
+    lines = [f"# {title} — {today:%A} {today.day} {today:%B %Y}", ""]
     if base:
         lines += [f"_Climbing figures compare with the snapshot from "
-                  f"{base_date.strftime('%A %-d %B')}. Tracking {fmt(len(pool))} repositories._", ""]
+                  f"{base_date:%A} {base_date.day} {base_date:%B}. Tracking {fmt(len(pool))} repositories._", ""]
     else:
         lines += [f"_{no_base}_", ""]
 
