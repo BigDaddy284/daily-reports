@@ -1,0 +1,79 @@
+{
+ "reports": [
+  {
+   "date": "2026-11-25",
+   "mode": "daily",
+   "file": "2026-11-25-daily.json"
+  },
+  {
+   "date": "2026-11-24",
+   "mode": "daily",
+   "file": "2026-11-24-daily.json"
+  },
+  {
+   "date": "2026-11-23",
+   "mode": "daily",
+   "file": "2026-11-23-daily.json"
+  },
+  {
+   "date": "2026-11-22",
+   "mode": "daily",
+   "file": "2026-11-22-daily.json"
+  },
+  {
+   "date": "2026-11-21",
+   "mode": "weekly",
+   "file": "2026-11-21-weekly.json"
+  },
+  {
+   "date": "2026-11-20",
+   "mode": "daily",
+   "file": "2026-11-20-daily.json"
+  },
+  {
+   "date": "2026-11-19",
+   "mode": "daily",
+   "file": "2026-11-19-daily.json"
+  },
+  {
+   "date": "2026-11-18",
+   "mode": "daily",
+   "file": "2026-11-18-daily.json"
+  },
+  {
+   "date": "2026-11-17",
+   "mode": "daily",
+   "file": "2026-11-17-daily.json"
+  },
+  {
+   "date": "2026-11-16",
+   "mode": "daily",
+   "file": "2026-11-16-daily.json"
+  },
+  {
+   "date": "2026-11-15",
+   "mode": "daily",
+   "file": "2026-11-15-daily.json"
+  },
+  {
+   "date": "2026-11-14",
+   "mode": "weekly",
+   "file": "2026-11-14-weekly.json"
+  },
+  {
+   "date": "2026-11-13",
+   "mode": "daily",
+   "file": "2026-11-13-daily.json"
+  },
+  {
+   "date": "2026-11-12",
+   "mode": "daily",
+   "file": "2026-11-12-daily.json"
+  },
+  {
+   "date": "2026-11-11",
+   "mode": "daily",
+   "file": "2026-11-11-daily.json"
+  }
+ ]
+}

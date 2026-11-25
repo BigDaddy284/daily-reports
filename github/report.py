@@ -4,7 +4,7 @@
 Pulls current star and fork counts for a pool of repositories via the GitHub
 search API (through the `gh` CLI), saves a compressed snapshot, compares it
 with earlier snapshots to work out what is climbing, and writes a Markdown
-report in UK English.
+report in UK English plus a JSON copy (github/data/) for the website.
 
 Usage:
     python3 report.py            # daily on Sun-Fri, weekly on Saturday (London time)
@@ -23,6 +23,7 @@ from zoneinfo import ZoneInfo
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SNAP_DIR = os.path.join(ROOT, "snapshots")
 REPORT_DIR = os.path.join(ROOT, "reports")
+DATA_DIR = os.path.join(ROOT, "data")  # JSON copies of each report, read by the website
 try:
     LONDON = ZoneInfo("Europe/London")
 except Exception:  # Windows without the tzdata package
@@ -164,29 +165,18 @@ def top(names_scores, n):
     return sorted(names_scores, key=lambda x: x[1], reverse=True)[:n]
 
 
-# --------------------------------------------------------------------------- output
-def fmt(n):
-    return f"{n:,}"
+# --------------------------------------------------------------------------- report data
+def item(name, r, gain=None):
+    return {"name": name, "stars": r["s"], "forks": r["f"], "desc": r["d"], "gain": gain}
 
 
-def line(i, name, r, extra=""):
-    desc = f" — {r['d']}" if r["d"] else ""
-    return (f"{i}. [{name}](https://github.com/{name}) · ★ {fmt(r['s'])} · "
-            f"⑂ {fmt(r['f'])}{extra}{desc}")
+def sec(key, title, rows, pool, unit=None, empty="No data yet."):
+    return {"key": key, "title": title, "unit": unit, "empty": empty,
+            "items": [item(n, pool[n], score if unit else None) for n, score in rows]}
 
 
-def section(title, rows, pool, unit=None, empty="No data yet."):
-    out = [f"## {title}", ""]
-    if not rows:
-        out.append(f"_{empty}_")
-    for i, (name, score) in enumerate(rows, 1):
-        extra = f" · **+{fmt(score)} {unit}**" if unit else ""
-        out.append(line(i, name, pool[name], extra))
-    out.append("")
-    return out
-
-
-def build_report(mode, today, pool, topic_recent):
+def build_data(mode, today, pool, topic_recent):
+    """Everything the report contains, as plain data (used for Markdown and the website)."""
     weekly = mode == "weekly"
     days = 7 if weekly else 1
     period = "this week" if weekly else "last 24 hours"
@@ -200,40 +190,96 @@ def build_report(mode, today, pool, topic_recent):
     fork_g = gains(pool, base, "f")
     since30 = (today - dt.timedelta(days=30)).isoformat()
 
-    title = "Weekly GitHub summary" if weekly else "Daily GitHub report"
-    lines = [f"# {title} — {today:%A} {today.day} {today:%B %Y}", ""]
     if base:
-        lines += [f"_Climbing figures compare with the snapshot from "
-                  f"{base_date:%A} {base_date.day} {base_date:%B}. Tracking {fmt(len(pool))} repositories._", ""]
+        note = (f"Climbing figures compare with the snapshot from "
+                f"{base_date:%A} {base_date.day} {base_date:%B}. Tracking {fmt(len(pool))} repositories.")
     else:
-        lines += [f"_{no_base}_", ""]
+        note = no_base
 
+    sections = []
     if weekly:
-        by_stars = top([(n, r["s"]) for n, r in pool.items()], 10)
-        by_forks = top([(n, r["f"]) for n, r in pool.items()], 10)
-        lines += section("Top 10 repositories of all time by stars", by_stars, pool)
-        lines += section("Top 10 repositories of all time by forks", by_forks, pool)
+        sections.append(sec("all_stars", "Top 10 repositories of all time by stars",
+                            top([(n, r["s"]) for n, r in pool.items()], 10), pool))
+        sections.append(sec("all_forks", "Top 10 repositories of all time by forks",
+                            top([(n, r["f"]) for n, r in pool.items()], 10), pool))
+    sections.append(sec("climb_stars", f"Top 5 climbing by stars ({period})",
+                        top([(n, g) for n, g in star_g.items() if g > 0], 5),
+                        pool, "stars", no_base))
+    sections.append(sec("climb_forks", f"Top 5 climbing by forks ({period})",
+                        top([(n, g) for n, g in fork_g.items() if g > 0], 5),
+                        pool, "forks", no_base))
+    sections.append(sec("trending", f"Top 5 trending ({period}, repositories created in the last 30 days)",
+                        top([(n, g) for n, g in star_g.items()
+                             if g > 0 and pool[n]["c"][:10] >= since30], 5),
+                        pool, "stars", no_base))
 
-    lines += section(f"Top 5 climbing by stars ({period})",
-                     top([(n, g) for n, g in star_g.items() if g > 0], 5),
-                     pool, "stars", no_base)
-    lines += section(f"Top 5 climbing by forks ({period})",
-                     top([(n, g) for n, g in fork_g.items() if g > 0], 5),
-                     pool, "forks", no_base)
-    lines += section(f"Top 5 trending ({period}, repositories created in the last 30 days)",
-                     top([(n, g) for n, g in star_g.items()
-                          if g > 0 and pool[n]["c"][:10] >= since30], 5),
-                     pool, "stars", no_base)
-
+    topics = []
     for label, slug in TOPICS:
         recent = [(n, pool[n]["s"]) for n in topic_recent.get(slug, [])]
-        lines += section(f"{label} — top 5 by stars (updated in the last 7 days)", recent, pool,
-                         empty="No repositories with this topic were updated in the last 7 days.")
         climb = top([(n, g) for n, g in star_g.items()
                      if g > 0 and slug in pool[n]["t"]], 5)
-        lines += section(f"{label} — top 5 climbing by stars ({period})", climb, pool, "stars",
-                         no_base if not base else "No repositories with this topic gained stars.")
+        topics.append({
+            "label": label, "slug": slug,
+            "top": sec("top", f"{label} — top 5 by stars (updated in the last 7 days)", recent, pool,
+                       empty="No repositories with this topic were updated in the last 7 days."),
+            "climb": sec("climb", f"{label} — top 5 climbing by stars ({period})", climb, pool, "stars",
+                         no_base if not base else "No repositories with this topic gained stars."),
+        })
+
+    return {
+        "date": today.isoformat(), "mode": mode,
+        "title": "Weekly GitHub summary" if weekly else "Daily GitHub report",
+        "period": period, "baseline": base_date.isoformat() if base else None,
+        "tracked": len(pool), "note": note, "sections": sections, "topics": topics,
+    }
+
+
+# --------------------------------------------------------------------------- output
+def fmt(n):
+    return f"{n:,}"
+
+
+def md_section(s):
+    out = [f"## {s['title']}", ""]
+    if not s["items"]:
+        out.append(f"_{s['empty']}_")
+    for i, it in enumerate(s["items"], 1):
+        extra = f" · **+{fmt(it['gain'])} {s['unit']}**" if s["unit"] else ""
+        desc = f" — {it['desc']}" if it["desc"] else ""
+        out.append(f"{i}. [{it['name']}](https://github.com/{it['name']}) · ★ {fmt(it['stars'])} · "
+                   f"⑂ {fmt(it['forks'])}{extra}{desc}")
+    out.append("")
+    return out
+
+
+def render_markdown(data):
+    d = dt.date.fromisoformat(data["date"])
+    lines = [f"# {data['title']} — {d:%A} {d.day} {d:%B %Y}", "", f"_{data['note']}_", ""]
+    for s in data["sections"]:
+        lines += md_section(s)
+    for t in data["topics"]:
+        lines += md_section(t["top"])
+        lines += md_section(t["climb"])
     return "\n".join(lines).rstrip() + "\n"
+
+
+def write_site_data(data):
+    """Save the report as JSON for the website, and refresh the list of reports."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    name = f"{data['date']}-{data['mode']}.json"
+    with open(os.path.join(DATA_DIR, name), "w", encoding="utf-8") as fh:
+        json.dump(data, fh, ensure_ascii=False, separators=(",", ":"))
+    write_data_index()
+
+
+def write_data_index():
+    reports = []
+    for fn in sorted(os.listdir(DATA_DIR), reverse=True):
+        if fn.endswith(".json") and fn != "index.json":
+            date, _, mode = fn[:-5].rpartition("-")
+            reports.append({"date": date, "mode": mode, "file": fn})
+    with open(os.path.join(DATA_DIR, "index.json"), "w", encoding="utf-8") as fh:
+        json.dump({"reports": reports}, fh, indent=1)
 
 
 # --------------------------------------------------------------------------- main
@@ -253,7 +299,8 @@ def main():
         sys.exit(f"error: only {len(pool)} repositories fetched; GitHub search may be failing")
     taken_at = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    report = build_report(mode, today, pool, topic_recent)
+    data = build_data(mode, today, pool, topic_recent)
+    report = render_markdown(data)
     save_snapshot(today, taken_at, pool)
     prune(today)
 
@@ -261,6 +308,7 @@ def main():
     out = os.path.join(REPORT_DIR, f"{today.isoformat()}-{mode}.md")
     with open(out, "w", encoding="utf-8") as fh:
         fh.write(report)
+    write_site_data(data)
     print(report)
     print(f"[saved {out}; pool {len(pool)} repos]", file=sys.stderr)
 
