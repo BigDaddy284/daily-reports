@@ -1,0 +1,69 @@
+name: Daily report
+
+# Runs the GitHub report every morning at about 09:12 UK time and publishes it.
+# GitHub's schedule is in UTC, so it is set for both 08:12 and 09:12 UTC
+# (09:12 in summer time and in winter). Whichever runs first makes the report;
+# the other sees today's snapshot already exists and does nothing.
+on:
+  schedule:
+    - cron: "12 8 * * *"
+    - cron: "12 9 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check whether today's report already exists
+        id: check
+        run: |
+          today=$(TZ=Europe/London date +%F)
+          echo "today=$today" >> "$GITHUB_OUTPUT"
+          hour=$(TZ=Europe/London date +%-H)
+          if [ -f "github/snapshots/$today.json.gz" ]; then
+            echo "Report for $today already exists, nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "schedule" ] && [ "$hour" -lt 9 ]; then
+            echo "Too early in UK time ($hour:xx), the later run will make it."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.check.outputs.skip == 'false'
+        with:
+          python-version: "3.12"
+
+      - name: Run the report
+        if: steps.check.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 github/report.py
+
+      - name: Commit and push
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898333+github-actions[bot]@users.noreply.github.com"
+          git add github
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "GitHub report ${{ steps.check.outputs.today }}"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep 10
+          done
+          exit 1
