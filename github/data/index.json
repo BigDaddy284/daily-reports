@@ -1,6 +1,11 @@
 {
  "reports": [
   {
+   "date": "2026-11-28",
+   "mode": "weekly",
+   "file": "2026-11-28-weekly.json"
+  },
+  {
    "date": "2026-11-27",
    "mode": "daily",
    "file": "2026-11-27-daily.json"
