@@ -339,7 +339,7 @@
   main.innerHTML = '<p class="loading">Loading the latest edition…</p>';
   getJSON(DATA + "index.json").then(function (idx) {
     if (page === "archive") return renderArchive(idx);
-    var file = pickReport(idx, page === "weekly" ? "weekly" : page === "today" ? "daily" : null);
+    var file = pickReport(idx, page === "weekly" ? "weekly" : null);
     return getJSON(DATA + file).then(function (d) {
       if (page === "interests") renderInterests(d); else renderReport(d, idx);
     });
