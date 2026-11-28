@@ -134,9 +134,23 @@
   function pager(idx, d, target) {
     var same = idx.reports.filter(function (r) { return target === "any" || r.mode === d.mode; });
     var i = same.findIndex(function (r) { return r.file === d.date + "-" + d.mode + ".json"; });
+    var base = target === "any" || d.mode !== "weekly" ? "index.html" : "weekly.html";
+    function href(r) { return base + "?r=" + encodeURIComponent(r.file); }
+    if (i < 0) i = 0;
+    if (target === "any") {
+      // A strip of dates: the edition being read and the 7 before it, oldest on the left.
+      // Reading the newest edition shows the last 8 days; an older one keeps a few newer days in view.
+      var start = Math.max(0, Math.min(i - 3, same.length - 8));
+      if (i < 8) start = 0;
+      var strip = same.slice(start, start + 8).reverse();
+      return '<nav class="pager pager-days" aria-label="Recent editions">' + strip.map(function (r) {
+        var txt = esc(day(r.date, { weekday: "short", day: "numeric", month: "short" }));
+        if (r.file === same[i].file) return '<span class="current" aria-current="page">' + txt + "</span>";
+        return '<a href="' + href(r) + '">' + txt + "</a>";
+      }).join("") + "</nav>";
+    }
     var older = same[i + 1], newer = same[i - 1];
-    var base = d.mode === "weekly" ? "weekly.html" : "index.html";
-    function link(r, txt) { return '<a href="' + base + "?r=" + encodeURIComponent(r.file) + '">' + txt + "</a>"; }
+    function link(r, txt) { return '<a href="' + href(r) + '">' + txt + "</a>"; }
     return '<div class="pager">' + (older ? link(older, "‹ " + esc(day(older.date, { weekday: "short", day: "numeric", month: "short" }))) : "") +
       (newer ? link(newer, esc(day(newer.date, { weekday: "short", day: "numeric", month: "short" })) + " ›") : "") + "</div>";
   }
@@ -155,7 +169,7 @@
       '<section class="col"><h3 class="col-title">Climbing by stars</h3>' + list(sectionByKey(d, "climb_stars"), { desc: true }) + "</section>" +
       '<section class="col"><h3 class="col-title">Trending new repos</h3>' + list(sectionByKey(d, "trending"), { desc: true }) + "</section></div>";
     html += interestsGrid(d);
-    html += '<div class="section-head">' + pager(idx, d) + "</div>";
+    html += '<div class="section-head">' + pager(idx, d, page === "weekly" ? null : "any") + "</div>";
     main.innerHTML = html;
     setDateline(longDate(d.date) + " · " + (weekly ? "Weekly summary" : "Daily report"));
     document.title = (weekly ? "Weekly summary" : "Daily report") + ", " + day(d.date, { day: "numeric", month: "long" }) + " · The Daily Index";

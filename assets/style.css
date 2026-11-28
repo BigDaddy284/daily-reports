@@ -73,6 +73,8 @@ h3.small { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.14em; text-transf
 footer.foot { margin-top: 28px; padding-top: 16px; border-top: 4px double var(--text); text-align: center; font-family: var(--serif); font-style: italic; font-size: 14px; color: var(--faint); }
 .pager { display: flex; gap: 16px; font-size: 14px; }
 .pager a { color: var(--green); }
+.pager-days { flex-wrap: wrap; gap: 8px 18px; }
+.pager-days .current { font-weight: 700; border-bottom: 2px solid var(--green); }
 .loading, .error { padding: 40px 0; font-family: var(--serif); font-style: italic; font-size: 18px; color: var(--faint); }
 .error { color: var(--gold); }
 
